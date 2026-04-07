@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>TranmixPhone.html</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; padding: 10px; color: #333; margin: 0; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; font-size: 1.5rem; margin: 10px 0; }
+        .config-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; background: #fafafa; }
+        label { display: block; font-weight: bold; margin-bottom: 3px; font-size: 0.85em; }
+        input, textarea { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; }
+        textarea { resize: vertical; }
+        #prompt { height: 80px; }
+        #output-display { height: 450px; padding: 12px; font-size: 1.05em; line-height: 1.8; overflow-y: auto; margin: 15px 0; background: #f9f9f9; border: 2px solid #2980b9; border-radius: 6px; }
+        .progress-container { margin: 15px 0; background: #eee; border-radius: 20px; height: 25px; overflow: hidden; position: relative; }
+        #progress-bar { background: #27ae60; width: 0%; height: 100%; transition: width 0.3s; }
+        #progress-text { position: absolute; width: 100%; text-align: center; top: 0; line-height: 25px; font-weight: bold; color: #000; font-size: 0.8em; }
+        .controls { display: flex; gap: 8px; justify-content: center; margin: 15px 0; flex-wrap: wrap; }
+        button { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 0.9em; }
+        .btn-start { background: #2980b9; color: white; flex: 1; min-width: 120px; }
+        .btn-stop { background: #e74c3c; color: white; flex: 1; min-width: 120px; }
+        .btn-copy { background: #f39c12; color: white; flex: 1; min-width: 120px; }
+        .btn-start:hover { background: #3498db; }
+        .btn-stop:hover { background: #c0392b; }
+        .btn-copy:hover { background: #e67e22; }
+        #log { margin: 15px 0; height: 150px; overflow-y: auto; background: #2c3e50; color: #ecf0f1; padding: 8px; font-family: monospace; font-size: 0.8em; border-radius: 5px; }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body { padding: 5px; }
+            .container { padding: 10px; }
+            h2 { font-size: 1.2rem; }
+            .config-grid { grid-template-columns: 1fr; gap: 8px; }
+            .card { padding: 10px; }
+            label { font-size: 0.8em; }
+            input, textarea { font-size: 0.85em; padding: 5px; }
+            #output-display { height: 300px; font-size: 1em; line-height: 1.7; }
+            .controls { gap: 5px; }
+            button { padding: 8px 10px; font-size: 0.8em; }
+            #log { height: 120px; font-size: 0.75em; }
+        }
+        
+        @media (max-width: 480px) {
+            .config-grid { grid-template-columns: 1fr; }
+            input, textarea { font-size: 0.8em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🚀 AI Novel Translator (Multi-Model)</h2>
+
+    <div class="config-grid">
+        <div class="card">
+            <label>Gemini API Key</label>
+            <input type="password" id="key-gemini" placeholder="AIza...">
+            <label>Batch Size (Dòng)</label>
+            <input type="number" id="batch-gemini" value="50">
+        </div>
+        <div class="card">
+            <label>OpenRouter Key</label>
+            <input type="password" id="key-or" placeholder="sk-or-...">
+            <label>Batch Size (Dòng)</label>
+            <input type="number" id="batch-or" value="30">
+        </div>
+        <div class="card">
+            <label>DeepSeek Key</label>
+            <input type="password" id="key-ds" placeholder="sk-...">
+            <label>Batch Size (Dòng)</label>
+            <input type="number" id="batch-ds" value="40">
+        </div>
+    </div>
+
+    <div class="card">
+        <label>Số lần thử lại (Retry)</label>
+        <input type="number" id="retry-count" value="2" oninput="saveSettings()">
+        <label>Delay (ms)</label>
+        <input type="number" id="retry-delay" value="2000" oninput="saveSettings()">
+    </div>
+
+    <label>Translation Prompt (English recommended):</label>
+    <textarea id="prompt">Role: Professional literary translator. Task: Translate to Vietnamese. Requirements: Natural flow, flexible pronouns, ONLY output translated text.</textarea>
+
+    <label style="margin-top: 15px;">Văn bản nguồn (Source):</label>
+    <textarea id="source-text" placeholder="Dán văn bản cần dịch tại đây..."></textarea>
+
+    <label style="margin-top: 15px;">📤 Bản dịch (Output):</label>
+    <textarea id="output-display" readonly>Kết quả dịch sẽ hiển thị tại đây...</textarea>
+
+    <div class="progress-container">
+        <div id="progress-bar"></div>
+        <div id="progress-text">0% (0/0 lines)</div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-start" onclick="startTranslation()">Bắt đầu dịch</button>
+        <button class="btn-stop" onclick="stopTranslation()">Dừng khẩn cấp</button>
+        <button class="btn-copy" onclick="copyToClipboard()">📋 Sao chép</button>
+    </div>
+
+    <div id="log">Sẵn sàng...</div>
+</div>
+
+<script>
+let isRunning = false;
+let translatedContent = "";
+
+// --- CƠ CHẾ TỰ ĐỘNG LƯU (NEW) ---
+const STORAGE_KEY = 'tranmix_configs';
+
+function saveSettings() {
+    const settings = {
+        geminiKey: document.getElementById('key-gemini').value,
+        geminiBatch: document.getElementById('batch-gemini').value,
+        orKey: document.getElementById('key-or').value,
+        orBatch: document.getElementById('batch-or').value,
+        dsKey: document.getElementById('key-ds').value,
+        dsBatch: document.getElementById('batch-ds').value,
+        prompt: document.getElementById('prompt').value
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+
+function loadSettings() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+        const s = JSON.parse(saved);
+        document.getElementById('key-gemini').value = s.geminiKey || "";
+        document.getElementById('batch-gemini').value = s.geminiBatch || "100";
+        document.getElementById('key-or').value = s.orKey || "";
+        document.getElementById('batch-or').value = s.orBatch || "50";
+        document.getElementById('key-ds').value = s.dsKey || "";
+        document.getElementById('batch-ds').value = s.dsBatch || "25";
+        document.getElementById('prompt').value = s.prompt || "Role: Professional literary translator. Task: Translate to Vietnamese. Requirements: Natural flow, flexible pronouns, ONLY output translated text.";
+        log("Đã tải cấu hình cũ thành công.");
+    }
+}
+
+// Lắng nghe sự kiện nhập liệu để lưu ngay lập tức
+document.addEventListener('input', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        saveSettings();
+    }
+});
+
+// Auto-save source-text
+document.getElementById('source-text').addEventListener('input', saveSettings);
+
+// Chạy load ngay khi mở web
+window.onload = loadSettings;
+// -------------------------------
+
+function log(msg) {
+    const logDiv = document.getElementById('log');
+    logDiv.innerHTML += `> ${msg}<br>`;
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+function copyToClipboard() {
+    const outputText = document.getElementById('output-display').value;
+    if (!outputText || outputText === "Kết quả dịch sẽ hiển thị tại đây...") {
+        alert("Chưa có kết quả dịch để sao chép!");
+        return;
+    }
+    navigator.clipboard.writeText(outputText).then(() => {
+        alert("✅ Đã sao chép vào bộ nhớ tạm!");
+    }).catch(() => {
+        alert("❌ Sao chép thất bại!");
+    });
+}
+
+async function callGemini(key, prompt, text) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt + "\n\nContent:\n" + text }] }] })
+    });
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+}
+
+async function callOpenAIStyle(url, key, model, prompt, text) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: model,
+            messages: [{role: "system", content: prompt}, {role: "user", content: text}]
+        })
+    });
+    const data = await response.json();
+    return data.choices[0].message.content;
+}
+
+async function startTranslation() {
+    if (isRunning) return;
+    
+    const sourceText = document.getElementById('source-text').value.trim();
+    if (!sourceText) return alert("Vui lòng nhập văn bản cần dịch!");
+
+    const lines = sourceText.split('\n').filter(l => l.trim() !== "");
+    const prompt = document.getElementById('prompt').value;
+    
+    // Lấy cấu hình retry từ giao diện
+    const MAX_RETRIES = parseInt(document.getElementById('retry-count').value) || 2;
+    const RETRY_DELAY = parseInt(document.getElementById('retry-delay').value) || 2000;
+
+    isRunning = true;
+    translatedContent = "";
+    let cur = 0;
+    const total = lines.length;
+
+    const config = {
+        gemini: { key: document.getElementById('key-gemini').value, batch: parseInt(document.getElementById('batch-gemini').value) },
+        or: { key: document.getElementById('key-or').value, batch: parseInt(document.getElementById('batch-or').value), url: "https://openrouter.ai/api/v1/chat/completions", model: "stepfun/step-3.5-flash:free" },
+        ds: { key: document.getElementById('key-ds').value, batch: parseInt(document.getElementById('batch-ds').value), url: "https://api.deepseek.com/chat/completions", model: "deepseek-chat" }
+    };
+
+    // Hàm cập nhật thanh tiến độ chuẩn xác
+    function updateProgress(current) {
+        const safeCurrent = Math.min(current, total);
+        const percent = ((safeCurrent / total) * 100).toFixed(1);
+        document.getElementById('progress-bar').style.width = percent + "%";
+        document.getElementById('progress-text').innerText = `${percent}% (${safeCurrent}/${total} dòng)`;
+    }
+
+    async function fetchWithRetry(apiFn, args, modelName) {
+        for (let i = 1; i <= MAX_RETRIES; i++) {
+            if (!isRunning) return null;
+            try {
+                return await apiFn(...args);
+            } catch (e) {
+                log(`${modelName} lỗi lần ${i}/${MAX_RETRIES}`);
+                if (i < MAX_RETRIES) await new Promise(r => setTimeout(r, RETRY_DELAY));
+            }
+        }
+        return null;
+    }
+
+    while (cur < total && isRunning) {
+        updateProgress(cur);
+        
+        let batchSize = config.gemini.batch;
+        let chunk = lines.slice(cur, cur + batchSize).join('\n');
+
+        log(`Đang xử lý từ dòng ${cur}...`);
+        let res = await fetchWithRetry(callGemini, [config.gemini.key, prompt, chunk], "Gemini");
+
+        if (res) {
+            translatedContent += res + "\n";
+            document.getElementById('output-display').value = translatedContent;
+            cur += batchSize;
+        } else {
+            log("Gemini thất bại. Chuyển OpenRouter cứu trợ...");
+            let debtEnd = Math.min(cur + batchSize, total);
+            while (cur < debtEnd && isRunning) {
+                updateProgress(cur);
+                let orBatch = Math.min(config.or.batch, debtEnd - cur);
+                let orChunk = lines.slice(cur, cur + orBatch).join('\n');
+                let orRes = await fetchWithRetry(callOpenAIStyle, [config.or.url, config.or.key, config.or.model, prompt, orChunk], "OpenRouter");
+
+                if (orRes) {
+                    translatedContent += orRes + "\n";
+                    document.getElementById('output-display').value = translatedContent;
+                    cur += orBatch;
+                } else {
+                    log("OpenRouter thất bại. Chuyển DeepSeek...");
+                    let dsBatch = Math.min(config.ds.batch, debtEnd - cur);
+                    let dsChunk = lines.slice(cur, cur + dsBatch).join('\n');
+                    let dsRes = await fetchWithRetry(callOpenAIStyle, [config.ds.url, config.ds.key, config.ds.model, prompt, dsChunk], "DeepSeek");
+
+                    if (dsRes) {
+                        translatedContent += dsRes + "\n";
+                        document.getElementById('output-display').value = translatedContent;
+                        cur += dsBatch;
+                    } else {
+                        log("CRITICAL: Mọi AI đều đầu hàng!");
+                        isRunning = false; break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Luôn ép tiến độ về 100% khi xong
+    if (cur >= total) {
+        updateProgress(total);
+        log("✅ HOÀN THÀNH! Kết quả sẵn sàng trong ô Output.");
+    } else {
+        log("⏹️ Đã dừng khẩn cấp.");
+    }
+}
+
+function stopTranslation() { 
+    isRunning = false; 
+    log("⏹️ Đã dừng!"); 
+}
+
+</script>
+</body>
+</html>
